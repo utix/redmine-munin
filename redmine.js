@@ -33,6 +33,13 @@ var options = {
     }
 };
 var issues = {};
+var stats = {
+    nb_issues: 0,
+    status: {},
+    priority: {},
+    life_time: 0,
+    max_life: 0
+};
 
 function _get_issues(offset, limit, callback, end) {
     options.path  = options.url + "?" + querystring.stringify({offset: offset, limit:limit});
@@ -72,8 +79,29 @@ function get_issues(issue_callback, end_callback) {
 
 
 get_issues(function(issue) {
+    /* store all issues */
     issues[issue.id] = issue;
+    life = (Date.now() - Date.parse(issue.created_on)) / 1000 / 60 / 60;
+
+    stats.nb_issues++;
+    if (stats.status[issue.status.id] === undefined) {
+         stats.status[issue.status.id] = {
+             nb: 0,
+             name: issue.status.name
+         };
+    }
+    stats.status[issue.status.id].nb++;
+    if (stats.priority[issue.priority.id] === undefined) {
+         stats.priority[issue.priority.id] = {
+             nb: 0,
+             name: issue.priority.name
+         };
+    }
+    stats.priority[issue.priority.id].nb++;
+    stats.max_life = Math.max(stats.max_life, life);
+    stats.life_time += life;
 },
 function(){
     console.log(issues);
+    console.log(stats);
 });
