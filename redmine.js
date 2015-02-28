@@ -24,17 +24,17 @@
 var http = require('http');
 var querystring = require('querystring');
 var options = {
-  hostname: process.env.hostname,
-  port: 80,
-  url: '/issues.json',
-  method: 'GET',
-  headers: {
-    'X-Redmine-API-Key': process.env.API_key
-  }
+    hostname: process.env.hostname,
+    port: 80,
+    url: '/issues.json',
+    method: 'GET',
+    headers: {
+        'X-Redmine-API-Key': process.env.API_key
+    }
 };
-var _issues = {};
+var issues = {};
 
-function _get_issues(offset, limit, callback) {
+function _get_issues(offset, limit, callback, end) {
     options.path  = options.url + "?" + querystring.stringify({offset: offset, limit:limit});
 
     var req = http.request(options, function(res) {
@@ -42,20 +42,21 @@ function _get_issues(offset, limit, callback) {
         res.setEncoding('utf8');
         res.on('data', function (chunk) {
             _data += chunk;
-              console.log("Partial data: received");
 
         });
         res.on('end', function() {
-              console.log('there will be no more data.');
-              var data = JSON.parse(_data);
-              data.issues.forEach(function(issue) {
-                  _issues[issue.id] = issue;
-              });
-              if (data.offset + data.limit < data.total_count) {
-                  _get_issues(data.offset + data.limit, limit, callback);
-              } else {
-                  callback(_issues);
-              }
+            var data = JSON.parse(_data);
+            var done = data.offset + data.limit < data.total_count;
+            if (!done) {
+                /* use data.limit as limit, server can clip our limit */
+                _get_issues(data.offset + data.limit, data.limit, callback);
+            }
+            data.issues.forEach(function(issue) {
+                callback(issue);
+            });
+            if (done) {
+                end();
+            }
         });
     });
 
@@ -64,8 +65,15 @@ function _get_issues(offset, limit, callback) {
     });
     req.end();
 }
+/* callback will be call for each issues */
+function get_issues(issue_callback, end_callback) {
+    _get_issues(0, 0, issue_callback, end_callback);
+}
 
-function get_issues(callback) { _get_issues(0, 0, callback); }
-get_issues(function(issues){
+
+get_issues(function(issue) {
+    issues[issue.id] = issue;
+},
+function(){
     console.log(issues);
 });
